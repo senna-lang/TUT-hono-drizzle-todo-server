@@ -2,12 +2,15 @@ import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { todos } from "./db/schema";
 import { eq } from "drizzle-orm";
+import { cors } from "hono/cors";
 
 type Bindings = {
   DB: D1Database;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
+
+app.use("/todos/*", cors());
 
 app.get("/", c => {
   return c.text("Hello Hono!");
@@ -66,9 +69,7 @@ app.delete("/todos/:id", async c => {
   }
 
   try {
-    const result = await db
-      .delete(todos)
-      .where(eq(todos.id, id));
+    const result = await db.delete(todos).where(eq(todos.id, id));
     return c.json(result);
   } catch (e) {
     return c.json({ error: "Failed to delete todos" }, 500);

@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
-import { todos } from "./db/schema";
+import { todos } from "../models";
 import { eq } from "drizzle-orm";
 import { cors } from "hono/cors";
+import { createTodo, deleteTodo, editTodo, getAllTodos } from "../applications";
 
-type Bindings = {
+export type Bindings = {
   DB: D1Database;
 };
 
@@ -19,10 +20,13 @@ app.get("/", c => {
 app.get("/todos", async c => {
   const db = drizzle(c.env.DB);
   try {
-    const result = await db.select().from(todos).all();
+    const result = await getAllTodos(db);
     return c.json(result);
   } catch (e) {
-    return c.json({ error: "Failed to fetch todos" }, 500);
+    if (e instanceof Error) {
+      return c.json({ error: e.message }, 500);
+    }
+    return c.json({ error: "unknown error" }, 500);
   }
 });
 
@@ -30,13 +34,13 @@ app.post("/todos", async c => {
   const params = await c.req.json<typeof todos.$inferInsert>();
   const db = drizzle(c.env.DB);
   try {
-    const result = await db
-      .insert(todos)
-      .values({ title: params.title })
-      .execute();
+    const result = await createTodo(db, params.title);
     return c.json(result);
   } catch (e) {
-    return c.json({ error: "Failed to create  todos" }, 500);
+    if (e instanceof Error) {
+      return c.json({ error: e.message }, 500);
+    }
+    return c.json({ error: "unknown error" }, 500);
   }
 });
 
@@ -50,13 +54,13 @@ app.put("/todos/:id", async c => {
 
   try {
     const params = await c.req.json<typeof todos.$inferSelect>();
-    const result = await db
-      .update(todos)
-      .set({ title: params.title, status: params.status })
-      .where(eq(todos.id, id));
+    const result = editTodo(db, id, params.title, params.status);
     return c.json(result);
   } catch (e) {
-    return c.json({ error: "Failed to update todos" }, 500);
+    if (e instanceof Error) {
+      return c.json({ error: e.message }, 500);
+    }
+    return c.json({ error: "unknown error" }, 500);
   }
 });
 
@@ -69,7 +73,7 @@ app.delete("/todos/:id", async c => {
   }
 
   try {
-    const result = await db.delete(todos).where(eq(todos.id, id));
+    const result = await deleteTodo(db, id);
     return c.json(result);
   } catch (e) {
     return c.json({ error: "Failed to delete todos" }, 500);
